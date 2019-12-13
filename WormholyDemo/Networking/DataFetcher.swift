@@ -7,10 +7,12 @@
 //
 
 import Foundation
+import Wormholy
 
-class DataFetcher: NSObject {
+class DataFetcher: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate {
 
     var session : URLSession? //Session manager
+    var httpProtocol: [Int: CustomHTTPProtocol] = [:]
     
     //MARK: Singleton
     static let sharedInstance = DataFetcher(managerCachePolicy: .reloadIgnoringLocalCacheData)
@@ -31,7 +33,7 @@ class DataFetcher: NSObject {
         sessionConfiguration.timeoutIntervalForRequest = 10.0
         sessionConfiguration.requestCachePolicy = cachePolicy != nil ? cachePolicy! : .reloadIgnoringLocalCacheData
         sessionConfiguration.httpAdditionalHeaders = ["Accept-Language": "en"]
-        self.session = URLSession(configuration: sessionConfiguration)
+        self.session = URLSession(configuration: sessionConfiguration, delegate: self, delegateQueue: nil)
     }
     
     
@@ -40,19 +42,9 @@ class DataFetcher: NSObject {
         var urlRequest = Routing.Post(id).urlRequest
         urlRequest.httpMethod = "GET"
         
-        let task = session?.dataTask(with: urlRequest) {
-            (
-            data, response, error) in
-            
-            guard response?.validate() == nil else{
-                failure(response!.validate()!)
-                return
-            }
-            DispatchQueue.main.async {
-                completion()
-            }
-        }
-        
+        let task = session?.dataTask(with: urlRequest)
+        httpProtocol[task!.hashValue] = CustomHTTPProtocol(task: task!, cachedResponse: nil, client: nil)
+        httpProtocol[task!.hashValue]?.startLoading()
         task?.resume()
     }
     
@@ -60,18 +52,7 @@ class DataFetcher: NSObject {
         var urlRequest = Routing.NewPost(userId: userId, title: title, body: body).urlRequest
         urlRequest.httpMethod = "POST"
         
-        let task = session?.dataTask(with: urlRequest) {
-            (
-            data, response, error) in
-            
-            guard response?.validate() == nil else{
-                failure(response!.validate()!)
-                return
-            }
-            DispatchQueue.main.async {
-                completion()
-            }
-        }
+        let task = session?.dataTask(with: urlRequest)
         
         task?.resume()
     }
@@ -80,18 +61,7 @@ class DataFetcher: NSObject {
         var urlRequest = Routing.WrongURL(()).urlRequest
         urlRequest.httpMethod = "GET"
         
-        let task = session?.dataTask(with: urlRequest) {
-            (
-            data, response, error) in
-            
-            guard response?.validate() == nil else{
-                failure(response!.validate()!)
-                return
-            }
-            DispatchQueue.main.async {
-                completion()
-            }
-        }
+        let task = session?.dataTask(with: urlRequest)
         
         task?.resume()
     }
@@ -100,20 +70,45 @@ class DataFetcher: NSObject {
         var urlRequest = Routing.Photos(()).urlRequest
         urlRequest.httpMethod = "GET"
         
-        let task = session?.dataTask(with: urlRequest) {
-            (
-            data, response, error) in
-            
-            guard response?.validate() == nil else{
-                failure(response!.validate()!)
-                return
-            }
-            DispatchQueue.main.async {
-                completion()
-            }
-        }
+        let task = session?.dataTask(with: urlRequest)
         
         task?.resume()
+    }
+    
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        print("RECEIVE")
+        httpProtocol[dataTask.hashValue]?.urlSession(didReceive: data)
+    }
+    
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        print("ERROR")
+        httpProtocol[task.hashValue]?.urlSession(didCompleteWithError: error)
+        httpProtocol[task.hashValue]?.stopLoading()
+    }
+    
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
+        httpProtocol[dataTask.hashValue]?.urlSession(didReceive: response)
+        completionHandler(.allow)
+    }
+    
+    public func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        print("CHALLENGE")
+        let protectionSpace = challenge.protectionSpace
+        let sender = challenge.sender
+
+        if protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust {
+            if let serverTrust = protectionSpace.serverTrust {
+                let credential = URLCredential(trust: serverTrust)
+                sender?.use(credential, for: challenge)
+                completionHandler(.useCredential, credential)
+                return
+            }
+        }
+    }
+    
+    func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+                print("CHALLENGE")
+
     }
 }
 

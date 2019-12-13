@@ -38,7 +38,7 @@ public class Wormholy: NSObject
     }
     
     @objc public static func enable(_ enable: Bool, sessionConfiguration: URLSessionConfiguration){
-        
+        return
         // Runtime check to make sure the API is available on this version
         if sessionConfiguration.responds(to: #selector(getter: URLSessionConfiguration.protocolClasses)) && sessionConfiguration.responds(to: #selector(setter: URLSessionConfiguration.protocolClasses)){
             var urlProtocolClasses = sessionConfiguration.protocolClasses

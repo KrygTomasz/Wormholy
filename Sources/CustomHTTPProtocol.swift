@@ -87,9 +87,8 @@ public class CustomHTTPProtocol: URLProtocol {
     }
 }
 
-extension CustomHTTPProtocol: URLSessionDataDelegate {
-    public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-        client?.urlProtocol(self, didLoad: data)
+extension CustomHTTPProtocol {
+    public func urlSession(didReceive data: Data) {
         if currentRequest?.dataResponse == nil{
             currentRequest?.dataResponse = data
         }
@@ -98,35 +97,19 @@ extension CustomHTTPProtocol: URLSessionDataDelegate {
         }
     }
     
-    public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
-        let policy = URLCache.StoragePolicy(rawValue: request.cachePolicy.rawValue) ?? .notAllowed
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: policy)
+    public func urlSession(didReceive response: URLResponse) {
         currentRequest?.initResponse(response: response)
-        completionHandler(.allow)
     }
     
-    public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    public func urlSession(didCompleteWithError error: Error?) {
         if let error = error {
             currentRequest?.errorClientDescription = error.localizedDescription
-            client?.urlProtocol(self, didFailWithError: error)
-        } else {
-            client?.urlProtocolDidFinishLoading(self)
         }
     }
     
-    public func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        client?.urlProtocol(self, wasRedirectedTo: request, redirectResponse: response)
-        completionHandler(request)
-    }
-    
-    public func urlSession(_ session: URLSession, didBecomeInvalidWithError error: Error?) {
+    public func urlSession(didBecomeInvalidWithError error: Error?) {
         guard let error = error else { return }
         currentRequest?.errorClientDescription = error.localizedDescription
-        client?.urlProtocol(self, didFailWithError: error)
-    }
-    
-    public func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-        client?.urlProtocolDidFinishLoading(self)
     }
 }
 
